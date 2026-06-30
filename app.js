@@ -33,35 +33,60 @@ const DEFAULT_STATE = {
   }
 };
 
-let state = JSON.parse(localStorage.getItem('bmv_budget_state')) || DEFAULT_STATE;
-function saveState() { localStorage.setItem('bmv_budget_state', JSON.stringify(state)); }
+let state = JSON.parse(localStorage.getItem('bmv_budget_state'));
+if (!state) {
+  state = DEFAULT_STATE;
+  localStorage.setItem('bmv_budget_state', JSON.stringify(state));
+}
+
+function saveState() {
+  localStorage.setItem('bmv_budget_state', JSON.stringify(state));
+}
 
 // ==========================================================================
-// 2. UTILS & COLOR LOGIC (BUDGET-DENKFEHLER BEHOBEN)
+// 2. UTILS & COLOR LOGIC (BUDGET-INVERSION AUSGABEN BEHOBEN)
 // ==========================================================================
 
-function uid() { return 'id_' + Math.random().toString(36).substr(2, 9); }
+function uid() {
+  return 'id_' + Math.random().toString(36).substr(2, 9);
+}
+
 function parseNum(val) {
   if (typeof val === 'number') return val;
   if (!val) return 0;
   let clean = val.toString().replace(/[^0-9,\-]/g, '').replace(',', '.');
   return parseFloat(clean) || 0;
 }
-function fmt(num) { return new Intl.NumberFormat('de-AT', { style: 'currency', currency: 'EUR' }).format(num || 0); }
-function fmtPercent(num) { return new Intl.NumberFormat('de-AT', { style: 'percent', minimumFractionDigits: 1 }).format(num || 0); }
-function getYearData() { return state.years[state.currentYear] || { referate: [], buchungssaetze: [] }; }
-function getCurrentTimestamp() { return new Date().toLocaleString('de-AT'); }
 
-// Gibt Klassen und Vorzeichen basierend auf Typ (Einnahme/Ausgabe) zurück
+function fmt(num) {
+  return new Intl.NumberFormat('de-AT', { style: 'currency', currency: 'EUR' }).format(num || 0);
+}
+
+function fmtPercent(num) {
+  if (isNaN(num) || !isFinite(num)) return '0,0 %';
+  return new Intl.NumberFormat('de-AT', { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(num);
+}
+
+function getYearData() {
+  if (!state.years[state.currentYear]) {
+    state.years[state.currentYear] = { gesperrt: false, freigegeben: false, freigabeHistorie: [], referate: [], buchungssaetze: [] };
+  }
+  return state.years[state.currentYear];
+}
+
+function getCurrentTimestamp() {
+  return new Date().toLocaleString('de-AT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+// Steuert die korrekte farbliche Bewertung von Einnahmen vs. Ausgaben
 function getAbweichungProps(typ, budget, ist) {
   const b = parseNum(budget);
   const i = parseNum(ist);
   const diff = i - b;
   
   let prozent = b !== 0 ? diff / b : 0;
-  letisGuenstig = typ === 'einnahme' ? diff >= 0 : diff <= 0;
-  
-  // Formatierung des Vorzeichens für die UI
+  // Einnahmen überschritten = gut (true) | Ausgaben unterschritten = gut (true)
+  let isGuenstig = typ === 'einnahme' ? diff >= 0 : diff <= 0;
   let sign = diff > 0 ? '+' : '';
   
   return {
@@ -73,22 +98,141 @@ function getAbweichungProps(typ, budget, ist) {
 }
 
 // ==========================================================================
-// 3. ROLES & AUTHENTICATION
+// 3. ROLES & AUTHENTICATION (FLEXIBLER LOGIN VIA BENUTZERNAME ODER EMAIL)
 // ==========================================================================
 
 function isAdmin() { return state.currentUser?.role === 'admin'; }
 function isPruefer() { return ['admin', 'pruefer'].includes(state.currentUser?.role); }
 function canWrite() { return ['admin', 'pruefer', 'schreiber'].includes(state.currentUser?.role); }
 
-function checkLogin(username, password) {
-  const u = username.toLowerCase().trim();
-  const user = state.users.find(usr => usr.username.toLowerCase() === u && usr.password === password && usr.active !== false);
-  if (user) { state.currentUser = user; saveState(); return true; }
+function checkLogin(loginInput, password) {
+  if (!loginInput || !password) return false;
+  
+  const searchKey = loginInput.toLowerCase().trim();
+  
+  // Findet den User anhand von username ODER email (unabhängig von Groß-/Kleinschreibung)
+  const user = state.users.find(usr => 
+    usr.active !== false && 
+    usr.password === password && 
+    ((usr.username && usr.username.toLowerCase() === searchKey) || 
+     (usr.email && usr.email.toLowerCase() === searchKey))
+  );
+  
+  if (user) {
+    state.currentUser = user;
+    saveState();
+    return true;
+  }
   return false;
 }
 
 // ==========================================================================
-// 4. INTERFACE: IST-WERTE ERFASSEN & VALIDIEREN
+// 4. NAVIGATION & SEITEN-SCHALTUNG
+// ==========================================================================
+
+function navigate(pageId) {
+  if (!state.currentUser && pageId !== 'login') {
+    navigate('login');
+    return;
+  }
+  
+  document.querySelectorAll('.page-content').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.sidebar-menu a').forEach(a => a.classList.remove('active'));
+  
+  const targetPage = document.getElementById(`page-${pageId}`);
+  if (targetPage) targetPage.style.display = 'block';
+  
+  const targetLink = document.querySelector(`.sidebar-menu a[data-page="${pageId}"]`);
+  if (targetLink) targetLink.classList.add('active');
+  
+  if (pageId === 'dashboard') renderDashboard();
+  if (pageId === 'referate') renderReferate();
+  if (pageId === 'budgetplanung') renderBudgetplanung();
+  if (pageId === 'istwerte') renderIstwerte();
+  if (pageId === 'benutzer') renderBenutzer();
+}
+
+// ==========================================================================
+// 5. CORE RENDERING LOGICS
+// ==========================================================================
+
+function renderDashboard() {
+  const d = getYearData();
+  const bs = d.buchungssaetze || [];
+
+  const bEin = bs.filter(b => b.typ === 'einnahme').reduce((s, b) => s + parseNum(b.budget), 0);
+  const bAus = bs.filter(b => b.typ === 'ausgabe').reduce((s, b) => s + parseNum(b.budget), 0);
+  const iEin = bs.filter(b => b.typ === 'einnahme').reduce((s, b) => s + parseNum(b.ist), 0);
+  const iAus = bs.filter(b => b.typ === 'ausgabe').reduce((s, b) => s + parseNum(b.ist), 0);
+
+  const budgetGridEin = document.getElementById('dash-budget-ein');
+  const budgetGridAus = document.getElementById('dash-budget-aus');
+  const budgetGridSaldo = document.getElementById('dash-saldo');
+  const istGridEin = document.getElementById('dash-ist-ein');
+  const istGridAus = document.getElementById('dash-ist-aus');
+  const istGridSaldo = document.getElementById('dash-ist-saldo');
+
+  if (budgetGridEin) budgetGridEin.innerText = fmt(bEin);
+  if (budgetGridAus) budgetGridAus.innerText = fmt(bAus);
+  if (budgetGridSaldo) budgetGridSaldo.innerText = fmt(bEin - bAus);
+  if (istGridEin) istGridEin.innerText = fmt(iEin);
+  if (istGridAus) istGridAus.innerText = fmt(iAus);
+  if (istGridSaldo) istGridSaldo.innerText = fmt(iEin - iAus);
+}
+
+function renderReferate() {
+  const d = getYearData();
+  const container = document.getElementById('referate-list');
+  if (!container) return;
+  container.innerHTML = '';
+
+  d.referate.forEach(r => {
+    let historieHtml = r.freigabeHistorie && r.freigabeHistorie.length > 0 
+      ? `<div class="historie-box mt-2 p-2 bg-light rounded style="font-size:0.85em""><strong>Freigabe-Historie:</strong><br>${r.freigabeHistorie.map(h => `• ${h}`).join('<br>')}</div>` 
+      : '<span class="text-muted d-block mt-2" style="font-size:0.85em">Keine Freigabehistorie vorhanden</span>';
+
+    const card = document.createElement('div');
+    card.className = 'card mb-3';
+    card.innerHTML = `
+      <div class="card-body d-flex justify-content-between align-items-center">
+        <div>
+          <h5 class="card-title mb-1">${r.name}</h5>
+          <p class="mb-0">Status: ${r.gesperrt ? '<span class="badge bg-danger">🔒 Freigegeben & Fixiert</span>' : '<span class="badge bg-success">✏️ In Bearbeitung</span>'}</p>
+          ${historieHtml}
+        </div>
+        ${isAdmin() ? `
+          <button class="btn btn-sm ${r.gesperrt ? 'btn-outline-warning' : 'btn-danger'}" onclick="toggleReferatSperre('${r.id}')">
+            ${r.gesperrt ? 'Entsperren' : 'Freigeben & Sperren'}
+          </button>
+        ` : ''}
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+function toggleReferatSperre(id) {
+  if (!isAdmin()) return;
+  const d = getYearData();
+  const r = d.referate.find(ref => ref.id === id);
+  if (r) {
+    r.gesperrt = !r.gesperrt;
+    if (!r.freigabeHistorie) r.freigabeHistorie = [];
+    
+    const aktion = r.gesperrt ? 'FIXIERT & FREIGEGEBEN' : 'WIEDER ENTSPERRT';
+    r.freigabeHistorie.push(`${getCurrentTimestamp()} von ${state.currentUser.name} (${aktion})`);
+    
+    saveState();
+    renderReferate();
+  }
+}
+
+function renderBudgetplanung() {
+  // Budgetplanungs-Tabellengenerierung
+}
+
+// ==========================================================================
+// 6. IST-WERTE ERFASSUNG MIT VALIDIERUNG UND FIXIERUNG (4-AUGEN-PRINZIP)
 // ==========================================================================
 
 function renderIstwerte() {
@@ -103,21 +247,21 @@ function renderIstwerte() {
     
     let aktionsButton = '';
     if (b.fixiert) {
-      aktionsButton = `<span class="badge bg-lock text-wrap">🔒 Fixiert am ${b.fixiertAm} von ${b.fixiertVon}</span>`;
+      aktionsButton = `<span class="badge bg-dark text-wrap">🔒 Fixiert am ${b.fixiertAm} von ${b.fixiertVon}</span>`;
       if (isAdmin()) {
-        aktionsButton += `<button class="btn btn-xs btn-outline-danger ms-2" onclick="unfixiereWert('${b.id}')">Aufheben</button>`;
+        aktionsButton += `<button class="btn btn-xs btn-outline-danger ms-2" style="font-size:0.75rem; padding:1px 5px;" onclick="unfixiereWert('${b.id}')">Aufheben</button>`;
       }
     } else if (isPruefer() && !d.gesperrt) {
-      aktionsButton = `<button class="btn btn-sm btn-success" onclick="fixiereWert('${b.id}')">✓ Fixieren</button>`;
+      aktionsButton = `<button class="btn btn-sm btn-success py-0" onclick="fixiereWert('${b.id}')">✓ Fixieren</button>`;
     }
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${b.bezeichnung}</td>
-      <td><span class="badge ${b.typ === 'einnahme' ? 'bg-success-light' : 'bg-warning-light'}">${b.typ.toUpperCase()}</span></td>
-      <td class="text-end">${fmt(b.budget)}</td>
+      <td><strong>${b.bezeichnung}</strong></td>
+      <td><span class="badge ${b.typ === 'einnahme' ? 'bg-success' : 'bg-warning text-dark'}">${b.typ.toUpperCase()}</span></td>
+      <td class="text-end fw-bold">${fmt(b.budget)}</td>
       <td>
-        <input type="text" class="form-control form-control-sm text-end input-ist" 
+        <input type="text" class="form-control form-control-sm text-end fw-bold" 
                value="${b.ist}" 
                ${darfEditieren ? '' : 'disabled'} 
                onchange="updateIstWert('${b.id}', this.value)" />
@@ -129,18 +273,17 @@ function renderIstwerte() {
   });
 }
 
-// VALIDIERUNG & UPDATE
 function updateIstWert(id, value) {
   const d = getYearData();
   const b = d.buchungssaetze.find(item => item.id === id);
   if (!b || b.fixiert || d.gesperrt) return;
 
-  // Validierung: Erlaubt deutsches Komma, wandelt um, verbietet negative Werte
+  // Validierung: Komma-Wandlung & Schutz vor negativen Eingaben oder Zeichenchaos
   let cleanValue = value.replace(',', '.').trim();
   let numericValue = parseFloat(cleanValue);
 
   if (isNaN(numericValue) || numericValue < 0) {
-    alert("Ungültige Eingabe! Bitte geben Sie eine positive, reelle Zahl ein.");
+    alert("Ungültiger Wert! Bitte tragen Sie eine positive Zahl ein.");
     renderIstwerte();
     return;
   }
@@ -150,7 +293,6 @@ function updateIstWert(id, value) {
   renderIstwerte();
 }
 
-// FIXIEREN (4-Augen-Prinzip)
 function fixiereWert(id) {
   if (!isPruefer()) return;
   const d = getYearData();
@@ -164,7 +306,6 @@ function fixiereWert(id) {
   }
 }
 
-// ENTSPERREN (Nur Admin)
 function unfixiereWert(id) {
   if (!isAdmin()) return;
   const d = getYearData();
@@ -179,23 +320,56 @@ function unfixiereWert(id) {
 }
 
 // ==========================================================================
-// 5. USER MANAGEMENT (FIXED)
+// 7. BENUTZERVERWALTUNG (BUG BEHOBEN BEI NEUANLAGE)
 // ==========================================================================
+
+function renderBenutzer() {
+  if (!isAdmin()) return;
+  const tbody = document.getElementById('benutzer-table-body');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  state.users.forEach(u => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><strong>${u.name}</strong></td>
+      <td><code>${u.username}</code></td>
+      <td>${u.email || '-'}</td>
+      <td><span class="badge bg-secondary">${u.role.toUpperCase()}</span></td>
+      <td>${u.active !== false ? '<span class="badge bg-success">Aktiv</span>' : '<span class="badge bg-danger">Inaktiv</span>'}</td>
+      <td>
+        ${u.id !== 'u1' ? `
+          <button class="btn btn-sm btn-outline-warning" onclick="toggleUserActive('${u.id}')">${u.active !== false ? 'Deaktivieren' : 'Aktivieren'}</button>
+        ` : '<span class="text-muted">Haupt-Admin</span>'}
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
 
 function handleCreateUser(event) {
   if (event) event.preventDefault();
   
   const nameInput = document.getElementById('user-new-name');
   const userInput = document.getElementById('user-new-username');
+  const emailInput = document.getElementById('user-new-email');
   const roleSelect = document.getElementById('user-new-role');
   const passInput = document.getElementById('user-new-password');
 
   if (!nameInput || !userInput || !passInput) return;
 
   const usernameClean = userInput.value.trim().toLowerCase();
+  const emailClean = emailInput ? emailInput.value.trim().toLowerCase() : '';
 
-  if (state.users.some(u => u.username === usernameClean)) {
-    alert('Fehler: Dieser Benutzername ist bereits vergeben!');
+  if (!usernameClean || !passInput.value) {
+    alert('Bitte füllen Sie mindestens Benutzernamen und Passwort aus!');
+    return;
+  }
+
+  // Eindeutigkeitsprüfung
+  const existiert = state.users.some(u => u.username.toLowerCase() === usernameClean || (emailClean && u.email && u.email.toLowerCase() === emailClean));
+  if (existiert) {
+    alert('Fehler: Ein Benutzer mit diesem Benutzernamen oder dieser E-Mail-Adresse ist bereits vorhanden!');
     return;
   }
 
@@ -203,15 +377,82 @@ function handleCreateUser(event) {
     id: uid(),
     name: nameInput.value.trim(),
     username: usernameClean,
+    email: emailClean,
     role: roleSelect ? roleSelect.value : 'schreiber',
     password: passInput.value,
     active: true
   };
 
   state.users.push(newUser);
-  saveState();
+  saveState(); // Schreibt direkt synchron in den Speicher
   
+  // Felder leeren
   nameInput.value = ''; userInput.value = ''; passInput.value = '';
-  alert(`Benutzer "${newUser.name}" wurde erfolgreich im System hinterlegt!`);
+  if (emailInput) emailInput.value = '';
+
+  alert(`Der Benutzer "${newUser.name}" wurde erfolgreich hinzugefügt! Login ab sofort via Username oder E-Mail möglich.`);
   renderBenutzer();
 }
+
+function toggleUserActive(id) {
+  if (id === 'u1') return;
+  const user = state.users.find(u => u.id === id);
+  if (user) {
+    user.active = user.active === false ? true : false;
+    saveState();
+    renderBenutzer();
+  }
+}
+
+// ==========================================================================
+// 8. INITIALISIERUNG & EVENT-LISTENERS (ID-TOLERANT)
+// ==========================================================================
+
+document.addEventListener('DOMContentLoaded', () => {
+  const loginForm = document.getElementById('login-form') || document.getElementById('login_form') || document.getElementById('budget-form');
+  
+  if (loginForm) {
+    loginForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      
+      const uInput = document.getElementById('login-username') || document.getElementById('login_username') || document.getElementById('loginUsername');
+      const pInput = document.getElementById('login-password') || document.getElementById('login_password') || document.getElementById('loginPassword');
+      const errorMsg = document.getElementById('login-error-msg') || document.getElementById('login_error_msg');
+      
+      if (!uInput || !pInput) return;
+
+      if (checkLogin(uInput.value, pInput.value)) {
+        if (errorMsg) errorMsg.style.display = 'none';
+        navigate('dashboard');
+        
+        const profName = document.getElementById('user-profile-name') || document.getElementById('userNameDisplay');
+        if (profName) profName.innerText = state.currentUser.name;
+      } else {
+        if (errorMsg) errorMsg.style.display = 'block';
+      }
+    });
+  }
+
+  const createUserBtn = document.getElementById('btn-save-new-user') || document.getElementById('save_user_btn');
+  if (createUserBtn) {
+    createUserBtn.addEventListener('click', handleCreateUser);
+  }
+
+  const logoutBtn = document.getElementById('btn-logout') || document.getElementById('logout_btn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => {
+      state.currentUser = null;
+      saveState();
+      window.location.reload(); 
+    });
+  }
+
+  // Einstiegspunkt steuern
+  if (state.currentUser) {
+    const profName = document.getElementById('user-profile-name') || document.getElementById('userNameDisplay');
+    if (profName) profName.innerText = state.currentUser.name;
+    navigate('dashboard');
+  } else {
+    navigate('login');
+  }
+});
