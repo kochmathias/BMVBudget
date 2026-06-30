@@ -134,7 +134,7 @@ function checkLogin(loginInput, password) {
 }
 
 // ==========================================================================
-// 4. NAVIGATION (MIT ADMIN-SCHUTZ FÜR BENUTZERVERWALTUNG)
+// 4. NAVIGATION
 // ==========================================================================
 
 function navigate(pageId) {
@@ -151,10 +151,9 @@ function navigate(pageId) {
     if (loginScreen) loginScreen.classList.remove('app-hidden', 'hidden');
     if (appScreen) appScreen.classList.add('hidden');
   } else {
-    // ABFANGEN: Wenn Nicht-Admin auf die Benutzerverwaltung klickt
     if (pageId === 'benutzer' && !isAdmin()) {
       alert('Rechte für diese Funktion nicht vorhanden');
-      navigate('dashboard'); // Umleiten auf das Dashboard
+      navigate('dashboard');
       return;
     }
 
@@ -203,6 +202,51 @@ function renderDashboard() {
   if (istGridEin) istGridEin.innerText = fmt(iEin);
   if (istGridAus) istGridAus.innerText = fmt(iAus);
   if (istGridSaldo) istGridSaldo.innerText = fmt(iEin - iAus);
+}
+
+function renderReferate() {
+  const d = getYearData();
+  const container = document.getElementById('referate-list');
+  if (!container) return;
+  container.innerHTML = '';
+
+  d.referate.forEach(r => {
+    let historieHtml = r.freigabeHistorie && r.freigabeHistorie.length > 0 
+      ? `<div class="historie-box mt-2 p-2 bg-light rounded" style="font-size:0.85em"><strong>Freigabe-Historie:</strong><br>${r.freigabeHistorie.map(h => `• ${h}`).join('<br>')}</div>` 
+      : '<span class="text-muted d-block mt-2" style="font-size:0.85em">Keine Freigabehistorie vorhanden</span>';
+
+    const card = document.createElement('div');
+    card.className = 'card mb-3';
+    card.innerHTML = `
+      <div class="card-body d-flex justify-content-between align-items-center">
+        <div>
+          <h5 class="card-title mb-1">${r.name}</h5>
+          <p class="mb-0">Status: ${r.gesperrt ? '<span class="badge bg-danger">🔒 Freigegeben & Fixiert</span>' : '<span class="badge bg-success">✏️ In Bearbeitung</span>'}</p>
+          ${historieHtml}
+        </div>
+        ${isAdmin() ? `
+          <button class="btn btn-sm ${r.gesperrt ? 'btn-outline-warning' : 'btn-danger'}" onclick="toggleReferatSperre('${r.id}')">
+            ${r.gesperrt ? 'Entsperren' : 'Freigeben & Sperren'}
+          </button>
+        ` : ''}
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+function toggleReferatSperre(id) {
+  if (!isAdmin()) return;
+  const d = getYearData();
+  const r = d.referate.find(ref => ref.id === id);
+  if (r) {
+    r.gesperrt = !r.gesperrt;
+    if (!r.freigabeHistorie) r.freigabeHistorie = [];
+    const aktion = r.gesperrt ? 'FIXIERT & FREIGEGEBEN' : 'WIEDER ENTSPERRT';
+    r.freigabeHistorie.push(`${getCurrentTimestamp()} von ${state.currentUser.name} (${aktion})`);
+    saveState();
+    renderReferate();
+  }
 }
 
 // ==========================================================================
@@ -292,53 +336,8 @@ function unfixiereWert(id) {
   }
 }
 
-function renderReferate() {
-  const d = getYearData();
-  const container = document.getElementById('referate-list');
-  if (!container) return;
-  container.innerHTML = '';
-
-  d.referate.forEach(r => {
-    let historieHtml = r.freigabeHistorie && r.freigabeHistorie.length > 0 
-      ? `<div class="historie-box mt-2 p-2 bg-light rounded" style="font-size:0.85em"><strong>Freigabe-Historie:</strong><br>${r.freigabeHistorie.map(h => `• ${h}`).join('<br>')}</div>` 
-      : '<span class="text-muted d-block mt-2" style="font-size:0.85em">Keine Freigabehistorie vorhanden</span>';
-
-    const card = document.createElement('div');
-    card.className = 'card mb-3';
-    card.innerHTML = `
-      <div class="card-body d-flex justify-content-between align-items-center">
-        <div>
-          <h5 class="card-title mb-1">${r.name}</h5>
-          <p class="mb-0">Status: ${r.gesperrt ? '<span class="badge bg-danger">🔒 Freigegeben & Fixiert</span>' : '<span class="badge bg-success">✏️ In Bearbeitung</span>'}</p>
-          ${historieHtml}
-        </div>
-        ${isAdmin() ? `
-          <button class="btn btn-sm ${r.gesperrt ? 'btn-outline-warning' : 'btn-danger'}" onclick="toggleReferatSperre('${r.id}')">
-            ${r.gesperrt ? 'Entsperren' : 'Freigeben & Sperren'}
-          </button>
-        ` : ''}
-      </div>
-    `;
-    container.appendChild(card);
-  });
-}
-
-function toggleReferatSperre(id) {
-  if (!isAdmin()) return;
-  const d = getYearData();
-  const r = d.referate.find(ref => ref.id === id);
-  if (r) {
-    r.gesperrt = !r.gesperrt;
-    if (!r.freigabeHistorie) r.freigabeHistorie = [];
-    const aktion = r.gesperrt ? 'FIXIERT & FREIGEGEBEN' : 'WIEDER ENTSPERRT';
-    r.freigabeHistorie.push(`${getCurrentTimestamp()} von ${state.currentUser.name} (${aktion})`);
-    saveState();
-    renderReferate();
-  }
-}
-
 // ==========================================================================
-// 7. BENUTZERVERWALTUNG (ZUSÄTZLICH BEIM RENDERN ABGESICHERT)
+// 7. BENUTZERVERWALTUNG (MIT PASSWORT-ANZEIGE)
 // ==========================================================================
 
 function renderBenutzer() {
@@ -462,10 +461,11 @@ window.doLogin = function(event) {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Pröziseres Entfernen des Erstanmeldetextes, um Navigationselemente nicht zu beeinträchtigen
   setTimeout(() => {
-    document.querySelectorAll('p, div, span, small').forEach(el => {
+    document.querySelectorAll('.card p, .login-box p, form + p, small').forEach(el => {
       if (el.textContent.includes('Erstanmeldung:')) {
-        el.style.display = 'none';
+        el.style.setProperty('display', 'none', 'important');
       }
     });
   }, 100);
@@ -477,6 +477,17 @@ document.addEventListener('DOMContentLoaded', () => {
       window.doLogin(e);
     });
   }
+
+  // Event Listener für Menü-Links reaktivieren, falls sie blockiert waren
+  document.querySelectorAll('.sidebar-menu a').forEach(link => {
+    link.addEventListener('click', (e) => {
+      const page = link.getAttribute('data-page');
+      if (page) {
+        e.preventDefault();
+        navigate(page);
+      }
+    });
+  });
 
   const createUserBtn = document.getElementById('btn-save-new-user') || document.getElementById('save_user_btn');
   if (createUserBtn) {
@@ -495,13 +506,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (state.currentUser) {
     const profName = document.getElementById('user-profile-name') || document.getElementById('userNameDisplay');
     if (profName) profName.innerText = state.currentUser.name;
-    
-    // Falls beim alten Laden noch eine ungültige Seite aktiv war, absichern
-    if (window.location.hash === '#benutzer' && !isAdmin()) {
-      navigate('dashboard');
-    } else {
-      navigate('dashboard');
-    }
+    navigate('dashboard');
   } else {
     navigate('login');
   }
