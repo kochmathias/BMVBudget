@@ -7,49 +7,56 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         .hidden { display: none !important; }
-        .sidebar { height: 100vh; background: #198754; color: white; padding: 20px; }
-        .nav-link { color: white !important; cursor: pointer; }
+        .app-hidden { display: none !important; }
+        .sidebar { min-height: 100vh; background: #198754; color: white; border-right: 1px solid #dee2e6; }
+        .sidebar-menu a { display: block; padding: 10px 20px; text-decoration: none; color: white; }
+        .sidebar-menu a.active { background: #146c43; }
     </style>
 </head>
 <body>
 
 <div id="app" class="container-fluid hidden">
     <div class="row">
-        <aside class="col-md-2 sidebar">
-            <h5>Vereinsbudget</h5>
-            <hr>
-            <nav class="nav flex-column">
-                <a class="nav-link" onclick="location.reload()">Dashboard neu laden</a>
-            </nav>
-        </aside>
+        <nav class="col-md-2 sidebar p-0">
+            <div class="p-3 text-center"><strong>Vereinsbudget</strong></div>
+            <div class="sidebar-menu">
+                <a href="#" data-page="dashboard" class="active">Dashboard</a>
+                <a href="#" data-page="referate">Referate</a>
+                <a href="#" data-page="istwerte">Ist-Werte</a>
+                <a href="#" data-page="benutzer">Benutzer</a>
+                <hr>
+                <a href="#" id="btn-logout" class="text-danger">Logout</a>
+            </div>
+        </nav>
         <main class="col-md-10 p-4">
-            <h2>Dashboard</h2>
-            <div class="row mt-4">
-                <div class="col-md-4">
-                    <div class="card p-3 shadow-sm">
-                        <h6>Einnahmen</h6>
-                        <h4 id="dash-ein">1.500,00 €</h4>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="card p-3 shadow-sm">
-                        <h6>Ausgaben</h6>
-                        <h4 id="dash-aus">800,00 €</h4>
-                    </div>
+            <div id="page-dashboard" class="page-content">
+                <h2>Dashboard</h2>
+                <div class="row mt-4">
+                    <div class="col-md-4"><div class="card p-3">Einnahmen: <h4 id="dash-budget-ein">0,00 €</h4></div></div>
+                    <div class="col-md-4"><div class="card p-3">Ausgaben: <h4 id="dash-budget-aus">0,00 €</h4></div></div>
+                    <div class="col-md-4"><div class="card p-3">Saldo: <h4 id="dash-saldo">0,00 €</h4></div></div>
                 </div>
             </div>
+            <div id="page-referate" class="page-content hidden"><h2>Referate</h2><div id="referate-list"></div></div>
+            <div id="page-istwerte" class="page-content hidden"><h2>Ist-Werte</h2><table class="table"><tbody id="istwerte-table-body"></tbody></table></div>
+            <div id="page-benutzer" class="page-content hidden"><h2>Benutzer</h2><table class="table"><tbody id="benutzer-table-body"></tbody></table></div>
         </main>
     </div>
 </div>
 
 <div id="loginScreen" class="container mt-5">
-    <div class="card mx-auto shadow" style="max-width: 400px; padding: 30px;">
-        <h3 class="text-center mb-4">Anmelden</h3>
-        <form id="loginForm">
-            <input type="text" id="user" class="form-control mb-3" placeholder="Benutzername" required>
-            <input type="password" id="pass" class="form-control mb-3" placeholder="Passwort" required>
-            <button type="submit" class="btn btn-success w-100">Login</button>
-        </form>
+    <div class="row justify-content-center">
+        <div class="col-md-4">
+            <div class="card p-4">
+                <h3 class="text-center">Login</h3>
+                <form id="login-form">
+                    <input type="text" id="login-username" class="form-control mb-3" placeholder="Benutzername" required>
+                    <input type="password" id="login-password" class="form-control mb-3" placeholder="Passwort" required>
+                    <button type="submit" class="btn btn-success w-100">Anmelden</button>
+                    <p class="text-muted small text-center mt-3">Erstanmeldung: admin / admin123</p>
+                </form>
+            </div>
+        </div>
     </div>
 </div>
 
