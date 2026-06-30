@@ -235,7 +235,7 @@ function renderReferate() {
   });
 }
 
-function toggleReferatSperre(id) {
+toggleReferatSperre = function(id) {
   if (!isAdmin()) return;
   const d = getYearData();
   const r = d.referate.find(ref => ref.id === id);
@@ -247,7 +247,7 @@ function toggleReferatSperre(id) {
     saveState();
     renderReferate();
   }
-}
+};
 
 // ==========================================================================
 // 6. IST-WERTE ERFASSUNG
@@ -434,7 +434,7 @@ window.doLogin = function(event) {
   }
 };
 
-// ABSOLUT SICHERES ENTFERNEN DES ERSTANMELDETEXTES
+// NUN ABSOLUT SICHER: ENTFERNT NUR DEN TEXT, NICHT DAS ELEMENT
 function hideErstanmeldungText() {
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
   let textNode = walker.nextNode();
@@ -442,17 +442,17 @@ function hideErstanmeldungText() {
     if (textNode.nodeValue && textNode.nodeValue.includes('Erstanmeldung:')) {
       const parent = textNode.parentElement;
       if (parent && parent.tagName !== 'SCRIPT' && parent.tagName !== 'STYLE') {
-        parent.style.setProperty('display', 'none', 'important');
+        // Wir löschen nur den Inhalt des Textknotens, lassen das HTML-Element aber intakt!
+        textNode.nodeValue = '';
       }
     }
-    textNode = walker.nextNode(); // Sicherer Fortschritt zur Vermeidung von Endlosschleifen
+    textNode = walker.nextNode();
   }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
   hideErstanmeldungText();
-  setTimeout(hideErstanmeldungText, 150);
-  setTimeout(hideErstanmeldungText, 500);
+  setTimeout(hideErstanmeldungText, 200);
 
   const loginForm = document.getElementById('login-form') || document.getElementById('login_form') || document.querySelector('form');
   if (loginForm) {
