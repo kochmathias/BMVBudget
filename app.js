@@ -134,27 +134,31 @@ function checkLogin(loginInput, password) {
 }
 
 // ==========================================================================
-// 4. NAVIGATION
+// 4. NAVIGATION (REPARIERT FÜR BEIDE BLOCKEER-KLASSEN)
 // ==========================================================================
 
 function navigate(pageId) {
+  const loginScreen = document.getElementById('loginScreen') || document.getElementById('page-login');
+  const appScreen = document.getElementById('app');
+
   if (!state.currentUser && pageId !== 'login') {
-    const loginScreen = document.getElementById('loginScreen') || document.getElementById('page-login');
-    const appScreen = document.getElementById('app');
-    if (loginScreen) loginScreen.classList.remove('app-hidden');
-    if (appScreen) appScreen.classList.add('app-hidden');
+    if (loginScreen) {
+      loginScreen.classList.remove('app-hidden', 'hidden');
+    }
+    if (appScreen) {
+      appScreen.classList.add('hidden');
+    }
     return;
   }
   
-  const loginScreen = document.getElementById('loginScreen') || document.getElementById('page-login');
-  const appScreen = document.getElementById('app');
-  
   if (pageId === 'login') {
-    if (loginScreen) loginScreen.classList.remove('app-hidden');
-    if (appScreen) appScreen.classList.add('app-hidden');
+    if (loginScreen) loginScreen.classList.remove('app-hidden', 'hidden');
+    if (appScreen) appScreen.classList.add('hidden');
   } else {
-    if (loginScreen) loginScreen.classList.add('app-hidden');
-    if (appScreen) appScreen.classList.remove('app-hidden');
+    if (loginScreen) loginScreen.classList.add('app-hidden', 'hidden');
+    if (appScreen) {
+      appScreen.classList.remove('app-hidden', 'hidden'); // Entfernt JETZT auch das originale 'hidden'!
+    }
     
     document.querySelectorAll('.page-content').forEach(p => p.style.display = 'none');
     document.querySelectorAll('.sidebar-menu a').forEach(a => a.classList.remove('active'));
@@ -403,16 +407,6 @@ function handleCreateUser(event) {
 
   alert(`Der Benutzer "${newUser.name}" wurde erfolgreich hinzugefügt!`);
   renderBenutzer();
-}
-
-function toggleUserActive(id) {
-  if (id === 'u1') return;
-  const user = state.users.find(u => u.id === id);
-  if (user) {
-    user.active = user.active === false ? true : false;
-    saveState();
-    renderBenutzer();
-  }
 }
 
 // ==========================================================================
