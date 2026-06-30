@@ -134,7 +134,7 @@ function checkLogin(loginInput, password) {
 }
 
 // ==========================================================================
-// 4. NAVIGATION (REPARIERT FÜR BEIDE BLOCKEER-KLASSEN)
+// 4. NAVIGATION (MIT ADMIN-SCHUTZ FÜR BENUTZERVERWALTUNG)
 // ==========================================================================
 
 function navigate(pageId) {
@@ -142,12 +142,8 @@ function navigate(pageId) {
   const appScreen = document.getElementById('app');
 
   if (!state.currentUser && pageId !== 'login') {
-    if (loginScreen) {
-      loginScreen.classList.remove('app-hidden', 'hidden');
-    }
-    if (appScreen) {
-      appScreen.classList.add('hidden');
-    }
+    if (loginScreen) loginScreen.classList.remove('app-hidden', 'hidden');
+    if (appScreen) appScreen.classList.add('hidden');
     return;
   }
   
@@ -155,10 +151,15 @@ function navigate(pageId) {
     if (loginScreen) loginScreen.classList.remove('app-hidden', 'hidden');
     if (appScreen) appScreen.classList.add('hidden');
   } else {
-    if (loginScreen) loginScreen.classList.add('app-hidden', 'hidden');
-    if (appScreen) {
-      appScreen.classList.remove('app-hidden', 'hidden'); // Entfernt JETZT auch das originale 'hidden'!
+    // ABFANGEN: Wenn Nicht-Admin auf die Benutzerverwaltung klickt
+    if (pageId === 'benutzer' && !isAdmin()) {
+      alert('Rechte für diese Funktion nicht vorhanden');
+      navigate('dashboard'); // Umleiten auf das Dashboard
+      return;
     }
+
+    if (loginScreen) loginScreen.classList.add('app-hidden', 'hidden');
+    if (appScreen) appScreen.classList.remove('app-hidden', 'hidden');
     
     document.querySelectorAll('.page-content').forEach(p => p.style.display = 'none');
     document.querySelectorAll('.sidebar-menu a').forEach(a => a.classList.remove('active'));
@@ -202,51 +203,6 @@ function renderDashboard() {
   if (istGridEin) istGridEin.innerText = fmt(iEin);
   if (istGridAus) istGridAus.innerText = fmt(iAus);
   if (istGridSaldo) istGridSaldo.innerText = fmt(iEin - iAus);
-}
-
-function renderReferate() {
-  const d = getYearData();
-  const container = document.getElementById('referate-list');
-  if (!container) return;
-  container.innerHTML = '';
-
-  d.referate.forEach(r => {
-    let historieHtml = r.freigabeHistorie && r.freigabeHistorie.length > 0 
-      ? `<div class="historie-box mt-2 p-2 bg-light rounded" style="font-size:0.85em"><strong>Freigabe-Historie:</strong><br>${r.freigabeHistorie.map(h => `• ${h}`).join('<br>')}</div>` 
-      : '<span class="text-muted d-block mt-2" style="font-size:0.85em">Keine Freigabehistorie vorhanden</span>';
-
-    const card = document.createElement('div');
-    card.className = 'card mb-3';
-    card.innerHTML = `
-      <div class="card-body d-flex justify-content-between align-items-center">
-        <div>
-          <h5 class="card-title mb-1">${r.name}</h5>
-          <p class="mb-0">Status: ${r.gesperrt ? '<span class="badge bg-danger">🔒 Freigegeben & Fixiert</span>' : '<span class="badge bg-success">✏️ In Bearbeitung</span>'}</p>
-          ${historieHtml}
-        </div>
-        ${isAdmin() ? `
-          <button class="btn btn-sm ${r.gesperrt ? 'btn-outline-warning' : 'btn-danger'}" onclick="toggleReferatSperre('${r.id}')">
-            ${r.gesperrt ? 'Entsperren' : 'Freigeben & Sperren'}
-          </button>
-        ` : ''}
-      </div>
-    `;
-    container.appendChild(card);
-  });
-}
-
-function toggleReferatSperre(id) {
-  if (!isAdmin()) return;
-  const d = getYearData();
-  const r = d.referate.find(ref => ref.id === id);
-  if (r) {
-    r.gesperrt = !r.gesperrt;
-    if (!r.freigabeHistorie) r.freigabeHistorie = [];
-    const aktion = r.gesperrt ? 'FIXIERT & FREIGEGEBEN' : 'WIEDER ENTSPERRT';
-    r.freigabeHistorie.push(`${getCurrentTimestamp()} von ${state.currentUser.name} (${aktion})`);
-    saveState();
-    renderReferate();
-  }
 }
 
 // ==========================================================================
@@ -336,15 +292,74 @@ function unfixiereWert(id) {
   }
 }
 
+function renderReferate() {
+  const d = getYearData();
+  const container = document.getElementById('referate-list');
+  if (!container) return;
+  container.innerHTML = '';
+
+  d.referate.forEach(r => {
+    let historieHtml = r.freigabeHistorie && r.freigabeHistorie.length > 0 
+      ? `<div class="historie-box mt-2 p-2 bg-light rounded" style="font-size:0.85em"><strong>Freigabe-Historie:</strong><br>${r.freigabeHistorie.map(h => `• ${h}`).join('<br>')}</div>` 
+      : '<span class="text-muted d-block mt-2" style="font-size:0.85em">Keine Freigabehistorie vorhanden</span>';
+
+    const card = document.createElement('div');
+    card.className = 'card mb-3';
+    card.innerHTML = `
+      <div class="card-body d-flex justify-content-between align-items-center">
+        <div>
+          <h5 class="card-title mb-1">${r.name}</h5>
+          <p class="mb-0">Status: ${r.gesperrt ? '<span class="badge bg-danger">🔒 Freigegeben & Fixiert</span>' : '<span class="badge bg-success">✏️ In Bearbeitung</span>'}</p>
+          ${historieHtml}
+        </div>
+        ${isAdmin() ? `
+          <button class="btn btn-sm ${r.gesperrt ? 'btn-outline-warning' : 'btn-danger'}" onclick="toggleReferatSperre('${r.id}')">
+            ${r.gesperrt ? 'Entsperren' : 'Freigeben & Sperren'}
+          </button>
+        ` : ''}
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+function toggleReferatSperre(id) {
+  if (!isAdmin()) return;
+  const d = getYearData();
+  const r = d.referate.find(ref => ref.id === id);
+  if (r) {
+    r.gesperrt = !r.gesperrt;
+    if (!r.freigabeHistorie) r.freigabeHistorie = [];
+    const aktion = r.gesperrt ? 'FIXIERT & FREIGEGEBEN' : 'WIEDER ENTSPERRT';
+    r.freigabeHistorie.push(`${getCurrentTimestamp()} von ${state.currentUser.name} (${aktion})`);
+    saveState();
+    renderReferate();
+  }
+}
+
 // ==========================================================================
-// 7. BENUTZERVERWALTUNG
+// 7. BENUTZERVERWALTUNG (ZUSÄTZLICH BEIM RENDERN ABGESICHERT)
 // ==========================================================================
 
 function renderBenutzer() {
-  if (!isAdmin()) return;
+  if (!isAdmin()) {
+    alert('Rechte für diese Funktion nicht vorhanden');
+    navigate('dashboard');
+    return;
+  }
+  
   const tbody = document.getElementById('benutzer-table-body');
   if (!tbody) return;
   tbody.innerHTML = '';
+
+  const table = tbody.closest('table');
+  if (table && table.querySelector('thead tr') && !table.querySelector('.th-password')) {
+    const th = document.createElement('th');
+    th.className = 'th-password';
+    th.innerText = 'Passwort';
+    const headerRow = table.querySelector('thead tr');
+    headerRow.insertBefore(th, headerRow.lastElementChild);
+  }
 
   state.users.forEach(u => {
     const tr = document.createElement('tr');
@@ -353,6 +368,7 @@ function renderBenutzer() {
       <td><code>${u.username}</code></td>
       <td>${u.email || '-'}</td>
       <td><span class="badge bg-secondary">${u.role.toUpperCase()}</span></td>
+      <td><strong><code>${u.password}</code></strong></td>
       <td>${u.active !== false ? '<span class="badge bg-success">Aktiv</span>' : '<span class="badge bg-danger">Inaktiv</span>'}</td>
       <td>
         ${u.id !== 'u1' ? `
@@ -364,8 +380,19 @@ function renderBenutzer() {
   });
 }
 
+function toggleUserActive(id) {
+  if (!isAdmin()) return;
+  const u = state.users.find(usr => usr.id === id);
+  if (u) {
+    u.active = u.active === false ? true : false;
+    saveState();
+    renderBenutzer();
+  }
+}
+
 function handleCreateUser(event) {
   if (event) event.preventDefault();
+  if (!isAdmin()) return;
   
   const nameInput = document.getElementById('user-new-name') || document.querySelector('[name="name"]');
   const userInput = document.getElementById('user-new-username') || document.querySelector('[name="username"]');
@@ -435,6 +462,14 @@ window.doLogin = function(event) {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(() => {
+    document.querySelectorAll('p, div, span, small').forEach(el => {
+      if (el.textContent.includes('Erstanmeldung:')) {
+        el.style.display = 'none';
+      }
+    });
+  }, 100);
+
   const loginForm = document.getElementById('login-form') || document.getElementById('login_form') || document.querySelector('form');
   if (loginForm) {
     loginForm.addEventListener('submit', (e) => {
@@ -460,7 +495,13 @@ document.addEventListener('DOMContentLoaded', () => {
   if (state.currentUser) {
     const profName = document.getElementById('user-profile-name') || document.getElementById('userNameDisplay');
     if (profName) profName.innerText = state.currentUser.name;
-    navigate('dashboard');
+    
+    // Falls beim alten Laden noch eine ungültige Seite aktiv war, absichern
+    if (window.location.hash === '#benutzer' && !isAdmin()) {
+      navigate('dashboard');
+    } else {
+      navigate('dashboard');
+    }
   } else {
     navigate('login');
   }
