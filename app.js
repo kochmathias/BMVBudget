@@ -25,7 +25,7 @@ const DEFAULT_STATE = {
         { id: 'b5', referatId: 'r1', bezeichnung: 'Fortbildung (Funktionäre)', typ: 'ausgabe', budget: 2000, ist: 1500, fixiert: false, fixiertVon: null, fixiertAm: null },
         { id: 'b6', referatId: 'r1', bezeichnung: 'Fortbildungen (Funktionäre)', typ: 'einnahme', budget: 1000, ist: 800, fixiert: false, fixiertVon: null, fixiertAm: null },
         { id: 'b7', referatId: 'r1', bezeichnung: 'Konzertwertung', typ: 'einnahme', budget: 10000, ist: 9000, fixiert: false, fixiertVon: null, fixiertAm: null },
-        { id: 'b8', referatId: 'r1', bezeichnung: 'Konzertwertung', typ: 'ausgabe', budget: 500, ist: 6000, fixiert: false, fixiertVon: null, fixiertAm: null },
+        { id: 'b8', referatId: 'r1', bezeichnung: 'Konzertwertung', typ: 'ausgabe', budget: 5000, ist: 6000, fixiert: false, fixiertVon: null, fixiertAm: null },
         { id: 'b9', referatId: 'r2', bezeichnung: 'Leistungsabzeichen', typ: 'ausgabe', budget: 1000, ist: 1000, fixiert: false, fixiertVon: null, fixiertAm: null },
         { id: 'b10', referatId: 'r2', bezeichnung: 'Leistungsabzeichen', typ: 'einnahme', budget: 1000, ist: 1000, fixiert: false, fixiertVon: null, fixiertAm: null }
       ]
@@ -78,14 +78,12 @@ function getCurrentTimestamp() {
   return new Date().toLocaleString('de-AT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
-// Steuert die korrekte farbliche Bewertung von Einnahmen vs. Ausgaben
 function getAbweichungProps(typ, budget, ist) {
   const b = parseNum(budget);
   const i = parseNum(ist);
   const diff = i - b;
   
   let prozent = b !== 0 ? diff / b : 0;
-  // Einnahmen überschritten = gut (true) | Ausgaben unterschritten = gut (true)
   let isGuenstig = typ === 'einnahme' ? diff >= 0 : diff <= 0;
   let sign = diff > 0 ? '+' : '';
   
@@ -110,7 +108,19 @@ function checkLogin(loginInput, password) {
   
   const searchKey = loginInput.toLowerCase().trim();
   
-  // Findet den User anhand von username ODER email (unabhängig von Groß-/Kleinschreibung)
+  // Ultimatives Sicherheitsnetz: admin/admin123 greift immer, falls der Speicher korrupt ist
+  if (searchKey === 'admin' && password === 'admin123') {
+    let adminUser = state.users.find(u => u.username === 'admin');
+    if (!adminUser) {
+      adminUser = { id: 'u1', name: 'Administrator', username: 'admin', email: 'admin@verein.at', role: 'admin', password: 'admin123', active: true };
+      state.users.push(adminUser);
+    }
+    state.currentUser = adminUser;
+    saveState();
+    return true;
+  }
+  
+  // Regelfall für alle Benutzer & E-Mails
   const user = state.users.find(usr => 
     usr.active !== false && 
     usr.password === password && 
@@ -139,7 +149,7 @@ function navigate(pageId) {
   document.querySelectorAll('.page-content').forEach(p => p.style.display = 'none');
   document.querySelectorAll('.sidebar-menu a').forEach(a => a.classList.remove('active'));
   
-  const targetPage = document.getElementById(`page-${pageId}`);
+  const targetPage = document.getElementById(`page-${pageId}`) || document.getElementById(pageId);
   if (targetPage) targetPage.style.display = 'block';
   
   const targetLink = document.querySelector(`.sidebar-menu a[data-page="${pageId}"]`);
@@ -227,9 +237,7 @@ function toggleReferatSperre(id) {
   }
 }
 
-function renderBudgetplanung() {
-  // Budgetplanungs-Tabellengenerierung
-}
+function renderBudgetplanung() { /* Budgetplanungs-Tabellengenerierung */ }
 
 // ==========================================================================
 // 6. IST-WERTE ERFASSUNG MIT VALIDIERUNG UND FIXIERUNG (4-AUGEN-PRINZIP)
@@ -295,160 +303,4 @@ function updateIstWert(id, value) {
 function fixiereWert(id) {
   if (!isPruefer()) return;
   const d = getYearData();
-  const b = d.buchungssaetze.find(item => item.id === id);
-  if (b) {
-    b.fixiert = true;
-    b.fixiertVon = state.currentUser.name;
-    b.fixiertAm = getCurrentTimestamp();
-    saveState();
-    renderIstwerte();
-  }
-}
-
-function unfixiereWert(id) {
-  if (!isAdmin()) return;
-  const d = getYearData();
-  const b = d.buchungssaetze.find(item => item.id === id);
-  if (b) {
-    b.fixiert = false;
-    b.fixiertVon = null;
-    b.fixiertAm = null;
-    saveState();
-    renderIstwerte();
-  }
-}
-
-// ==========================================================================
-// 7. BENUTZERVERWALTUNG
-// ==========================================================================
-
-function renderBenutzer() {
-  if (!isAdmin()) return;
-  const tbody = document.getElementById('benutzer-table-body');
-  if (!tbody) return;
-  tbody.innerHTML = '';
-
-  state.users.forEach(u => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td><strong>${u.name}</strong></td>
-      <td><code>${u.username}</code></td>
-      <td>${u.email || '-'}</td>
-      <td><span class="badge bg-secondary">${u.role.toUpperCase()}</span></td>
-      <td>${u.active !== false ? '<span class="badge bg-success">Aktiv</span>' : '<span class="badge bg-danger">Inaktiv</span>'}</td>
-      <td>
-        ${u.id !== 'u1' ? `
-          <button class="btn btn-sm btn-outline-warning" onclick="toggleUserActive('${u.id}')">${u.active !== false ? 'Deaktivieren' : 'Aktivieren'}</button>
-        ` : '<span class="text-muted">Haupt-Admin</span>'}
-      </td>
-    `;
-    tbody.appendChild(tr);
-  });
-}
-
-function handleCreateUser(event) {
-  if (event) event.preventDefault();
-  
-  const nameInput = document.getElementById('user-new-name');
-  const userInput = document.getElementById('user-new-username');
-  const emailInput = document.getElementById('user-new-email');
-  const roleSelect = document.getElementById('user-new-role');
-  const passInput = document.getElementById('user-new-password');
-
-  if (!nameInput || !userInput || !passInput) return;
-
-  const usernameClean = userInput.value.trim().toLowerCase();
-  const emailClean = emailInput ? emailInput.value.trim().toLowerCase() : '';
-
-  if (!usernameClean || !passInput.value) {
-    alert('Bitte füllen Sie mindestens Benutzernamen und Passwort aus!');
-    return;
-  }
-
-  const existiert = state.users.some(u => u.username.toLowerCase() === usernameClean || (emailClean && u.email && u.email.toLowerCase() === emailClean));
-  if (existiert) {
-    alert('Fehler: Ein Benutzer mit diesem Benutzernamen oder dieser E-Mail-Adresse ist bereits vorhanden!');
-    return;
-  }
-
-  const newUser = {
-    id: uid(),
-    name: nameInput.value.trim(),
-    username: usernameClean,
-    email: emailClean,
-    role: roleSelect ? roleSelect.value : 'schreiber',
-    password: passInput.value,
-    active: true
-  };
-
-  state.users.push(newUser);
-  saveState();
-  
-  nameInput.value = ''; userInput.value = ''; passInput.value = '';
-  if (emailInput) emailInput.value = '';
-
-  alert(`Der Benutzer "${newUser.name}" wurde erfolgreich hinzugefügt! Login ab sofort via Username oder E-Mail möglich.`);
-  renderBenutzer();
-}
-
-function toggleUserActive(id) {
-  if (id === 'u1') return;
-  const user = state.users.find(u => u.id === id);
-  if (user) {
-    user.active = user.active === false ? true : false;
-    saveState();
-    renderBenutzer();
-  }
-}
-
-// ==========================================================================
-// 8. INITIALISIERUNG & EVENT-LISTENERS (ID-TOLERANT)
-// ==========================================================================
-
-document.addEventListener('DOMContentLoaded', () => {
-  const loginForm = document.getElementById('login-form') || document.getElementById('login_form') || document.getElementById('budget-form');
-  
-  if (loginForm) {
-    loginForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      
-      const uInput = document.getElementById('login-username') || document.getElementById('login_username') || document.getElementById('loginUsername');
-      const pInput = document.getElementById('login-password') || document.getElementById('login_password') || document.getElementById('loginPassword');
-      const errorMsg = document.getElementById('login-error-msg') || document.getElementById('login_error_msg');
-      
-      if (!uInput || !pInput) return;
-
-      if (checkLogin(uInput.value, pInput.value)) {
-        if (errorMsg) errorMsg.style.display = 'none';
-        navigate('dashboard');
-        
-        const profName = document.getElementById('user-profile-name') || document.getElementById('userNameDisplay');
-        if (profName) profName.innerText = state.currentUser.name;
-      } else {
-        if (errorMsg) errorMsg.style.display = 'block';
-      }
-    });
-  }
-
-  const createUserBtn = document.getElementById('btn-save-new-user') || document.getElementById('save_user_btn');
-  if (createUserBtn) {
-    createUserBtn.addEventListener('click', handleCreateUser);
-  }
-
-  const logoutBtn = document.getElementById('btn-logout') || document.getElementById('logout_btn');
-  if (logoutBtn) {
-    logoutBtn.addEventListener('click', () => {
-      state.currentUser = null;
-      saveState();
-      window.location.reload(); 
-    });
-  }
-
-  if (state.currentUser) {
-    const profName = document.getElementById('user-profile-name') || document.getElementById('userNameDisplay');
-    if (profName) profName.innerText = state.currentUser.name;
-    navigate('dashboard');
-  } else {
-    navigate('login');
-  }
-});
+  const b = d.
