@@ -235,7 +235,7 @@ function renderReferate() {
   });
 }
 
-toggleReferatSperre = function(id) {
+function toggleReferatSperre(id) {
   if (!isAdmin()) return;
   const d = getYearData();
   const r = d.referate.find(ref => ref.id === id);
@@ -247,7 +247,7 @@ toggleReferatSperre = function(id) {
     saveState();
     renderReferate();
   }
-};
+}
 
 // ==========================================================================
 // 6. IST-WERTE ERFASSUNG
@@ -308,6 +308,32 @@ function updateIstWert(id, value) {
   b.ist = numericValue;
   saveState();
   renderIstwerte();
+}
+
+function fixiereWert(id) {
+  if (!isPruefer()) return;
+  const d = getYearData();
+  const b = d.buchungssaetze.find(item => item.id === id);
+  if (b) {
+    b.fixiert = true;
+    b.fixiertVon = state.currentUser.name;
+    b.fixiertAm = getCurrentTimestamp();
+    saveState();
+    renderIstwerte();
+  }
+}
+
+function unfixiereWert(id) {
+  if (!isAdmin()) return;
+  const d = getYearData();
+  const b = d.buchungssaetze.find(item => item.id === id);
+  if (b) {
+    b.fixiert = false;
+    b.fixiertVon = null;
+    b.fixiertAm = null;
+    saveState();
+    renderIstwerte();
+  }
 }
 
 // ==========================================================================
@@ -434,26 +460,7 @@ window.doLogin = function(event) {
   }
 };
 
-// NUN ABSOLUT SICHER: ENTFERNT NUR DEN TEXT, NICHT DAS ELEMENT
-function hideErstanmeldungText() {
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
-  let textNode = walker.nextNode();
-  while (textNode) {
-    if (textNode.nodeValue && textNode.nodeValue.includes('Erstanmeldung:')) {
-      const parent = textNode.parentElement;
-      if (parent && parent.tagName !== 'SCRIPT' && parent.tagName !== 'STYLE') {
-        // Wir löschen nur den Inhalt des Textknotens, lassen das HTML-Element aber intakt!
-        textNode.nodeValue = '';
-      }
-    }
-    textNode = walker.nextNode();
-  }
-}
-
 document.addEventListener('DOMContentLoaded', () => {
-  hideErstanmeldungText();
-  setTimeout(hideErstanmeldungText, 200);
-
   const loginForm = document.getElementById('login-form') || document.getElementById('login_form') || document.querySelector('form');
   if (loginForm) {
     loginForm.addEventListener('submit', (e) => {
