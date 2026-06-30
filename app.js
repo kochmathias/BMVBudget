@@ -98,7 +98,7 @@ function getAbweichungProps(typ, budget, ist) {
 }
 
 // ==========================================================================
-// 3. ROLES & AUTHENTICATION (FLEXIBLER LOGIN VIA BENUTZERNAME ODER EMAIL)
+// 3. ROLES & AUTHENTICATION (LOGIN VIA BENUTZERNAME ODER EMAIL)
 // ==========================================================================
 
 function isAdmin() { return state.currentUser?.role === 'admin'; }
@@ -188,7 +188,7 @@ function renderReferate() {
 
   d.referate.forEach(r => {
     let historieHtml = r.freigabeHistorie && r.freigabeHistorie.length > 0 
-      ? `<div class="historie-box mt-2 p-2 bg-light rounded style="font-size:0.85em""><strong>Freigabe-Historie:</strong><br>${r.freigabeHistorie.map(h => `• ${h}`).join('<br>')}</div>` 
+      ? `<div class="historie-box mt-2 p-2 bg-light rounded" style="font-size:0.85em"><strong>Freigabe-Historie:</strong><br>${r.freigabeHistorie.map(h => `• ${h}`).join('<br>')}</div>` 
       : '<span class="text-muted d-block mt-2" style="font-size:0.85em">Keine Freigabehistorie vorhanden</span>';
 
     const card = document.createElement('div');
@@ -278,7 +278,6 @@ function updateIstWert(id, value) {
   const b = d.buchungssaetze.find(item => item.id === id);
   if (!b || b.fixiert || d.gesperrt) return;
 
-  // Validierung: Komma-Wandlung & Schutz vor negativen Eingaben oder Zeichenchaos
   let cleanValue = value.replace(',', '.').trim();
   let numericValue = parseFloat(cleanValue);
 
@@ -320,7 +319,7 @@ function unfixiereWert(id) {
 }
 
 // ==========================================================================
-// 7. BENUTZERVERWALTUNG (BUG BEHOBEN BEI NEUANLAGE)
+// 7. BENUTZERVERWALTUNG
 // ==========================================================================
 
 function renderBenutzer() {
@@ -366,7 +365,6 @@ function handleCreateUser(event) {
     return;
   }
 
-  // Eindeutigkeitsprüfung
   const existiert = state.users.some(u => u.username.toLowerCase() === usernameClean || (emailClean && u.email && u.email.toLowerCase() === emailClean));
   if (existiert) {
     alert('Fehler: Ein Benutzer mit diesem Benutzernamen oder dieser E-Mail-Adresse ist bereits vorhanden!');
@@ -384,9 +382,8 @@ function handleCreateUser(event) {
   };
 
   state.users.push(newUser);
-  saveState(); // Schreibt direkt synchron in den Speicher
+  saveState();
   
-  // Felder leeren
   nameInput.value = ''; userInput.value = ''; passInput.value = '';
   if (emailInput) emailInput.value = '';
 
@@ -447,7 +444,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Einstiegspunkt steuern
   if (state.currentUser) {
     const profName = document.getElementById('user-profile-name') || document.getElementById('userNameDisplay');
     if (profName) profName.innerText = state.currentUser.name;
