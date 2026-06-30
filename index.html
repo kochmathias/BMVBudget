@@ -2,58 +2,43 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>Budget-Verwaltung</title>
+    <title>Vereinsbudget</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         .hidden { display: none !important; }
-        .sidebar { min-height: 100vh; background: #f8f9fa; border-right: 1px solid #dee2e6; }
-        .sidebar-menu a { display: block; padding: 10px 20px; text-decoration: none; color: #333; }
-        .sidebar-menu a.active { background: #0d6efd; color: white; }
+        .sidebar { min-height: 100vh; background: #198754; color: white; }
+        .page-content { padding: 20px; }
     </style>
 </head>
 <body>
 
 <div id="app" class="container-fluid hidden">
     <div class="row">
-        <nav class="col-md-2 sidebar p-0">
-            <div class="p-3 text-center"><strong>Budget-Tool</strong></div>
-            <div class="sidebar-menu">
-                <a href="#" data-page="dashboard" class="active">Dashboard</a>
-                <a href="#" data-page="referate">Referate</a>
-                <a href="#" data-page="istwerte">Ist-Werte</a>
-                <a href="#" data-page="benutzer">Benutzer</a>
-                <hr>
-                <a href="#" id="btn-logout" class="text-danger">Logout</a>
-            </div>
-        </nav>
-        <main class="col-md-10 p-4">
+        <aside class="col-md-2 sidebar">
+            <div class="p-3"><strong>Vereinsbudget</strong></div>
+            <hr>
+            <a href="#" class="nav-link text-white" onclick="navigate('dashboard')">Dashboard</a>
+        </aside>
+        <main class="col-md-10">
             <div id="page-dashboard" class="page-content">
                 <h2>Dashboard</h2>
                 <div class="row mt-4">
                     <div class="col-md-4"><div class="card p-3">Einnahmen: <h4 id="dash-budget-ein">0,00 €</h4></div></div>
                     <div class="col-md-4"><div class="card p-3">Ausgaben: <h4 id="dash-budget-aus">0,00 €</h4></div></div>
-                    <div class="col-md-4"><div class="card p-3">Saldo: <h4 id="dash-saldo">0,00 €</h4></div></div>
                 </div>
             </div>
-            <div id="page-referate" class="page-content hidden"><h2>Referate</h2><div id="referate-list"></div></div>
-            <div id="page-istwerte" class="page-content hidden"><h2>Ist-Werte</h2><table class="table"><thead><tr><th>Bezeichnung</th><th>Budget</th><th>Ist</th><th>Abweichung</th></tr></thead><tbody id="istwerte-table-body"></tbody></table></div>
-            <div id="page-benutzer" class="page-content hidden"><h2>Benutzer</h2><table class="table"><tbody id="benutzer-table-body"></tbody></table></div>
         </main>
     </div>
 </div>
 
 <div id="loginScreen" class="container mt-5">
-    <div class="row justify-content-center">
-        <div class="col-md-4">
-            <div class="card p-4">
-                <h3 class="text-center">Login</h3>
-                <form id="login-form">
-                    <input type="text" id="login-username" class="form-control mb-3" placeholder="Benutzername" required>
-                    <input type="password" id="login-password" class="form-control mb-3" placeholder="Passwort" required>
-                    <button type="submit" class="btn btn-primary w-100">Anmelden</button>
-                </form>
-            </div>
-        </div>
+    <div class="card p-4 mx-auto" style="max-width: 400px;">
+        <h3 class="text-center">Login</h3>
+        <form id="loginForm">
+            <input type="text" id="username" class="form-control mb-3" placeholder="Benutzername" required>
+            <input type="password" id="password" class="form-control mb-3" placeholder="Passwort" required>
+            <button type="submit" class="btn btn-success w-100">Anmelden</button>
+        </form>
     </div>
 </div>
 
