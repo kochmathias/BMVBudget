@@ -44,7 +44,7 @@ function saveState() {
 }
 
 // ==========================================================================
-// 2. UTILS & COLOR LOGIC (BUDGET-INVERSION AUSGABEN BEHOBEN)
+// 2. UTILS & COLOR LOGIC
 // ==========================================================================
 
 function uid() {
@@ -96,7 +96,7 @@ function getAbweichungProps(typ, budget, ist) {
 }
 
 // ==========================================================================
-// 3. ROLES & AUTHENTICATION (LOGIN VIA BENUTZERNAME ODER EMAIL)
+// 3. ROLES & AUTHENTICATION
 // ==========================================================================
 
 function isAdmin() { return state.currentUser?.role === 'admin'; }
@@ -105,10 +105,8 @@ function canWrite() { return ['admin', 'pruefer', 'schreiber'].includes(state.cu
 
 function checkLogin(loginInput, password) {
   if (!loginInput || !password) return false;
-  
   const searchKey = loginInput.toLowerCase().trim();
   
-  // Ultimatives Sicherheitsnetz: admin/admin123 greift immer, falls der Speicher korrupt ist
   if (searchKey === 'admin' && password === 'admin123') {
     let adminUser = state.users.find(u => u.username === 'admin');
     if (!adminUser) {
@@ -120,7 +118,6 @@ function checkLogin(loginInput, password) {
     return true;
   }
   
-  // Regelfall für alle Benutzer & E-Mails
   const user = state.users.find(usr => 
     usr.active !== false && 
     usr.password === password && 
@@ -137,29 +134,42 @@ function checkLogin(loginInput, password) {
 }
 
 // ==========================================================================
-// 4. NAVIGATION & SEITEN-SCHALTUNG
+// 4. NAVIGATION
 // ==========================================================================
 
 function navigate(pageId) {
   if (!state.currentUser && pageId !== 'login') {
-    navigate('login');
+    const loginScreen = document.getElementById('loginScreen') || document.getElementById('page-login');
+    const appScreen = document.getElementById('app');
+    if (loginScreen) loginScreen.classList.remove('app-hidden');
+    if (appScreen) appScreen.classList.add('app-hidden');
     return;
   }
   
-  document.querySelectorAll('.page-content').forEach(p => p.style.display = 'none');
-  document.querySelectorAll('.sidebar-menu a').forEach(a => a.classList.remove('active'));
+  const loginScreen = document.getElementById('loginScreen') || document.getElementById('page-login');
+  const appScreen = document.getElementById('app');
   
-  const targetPage = document.getElementById(`page-${pageId}`) || document.getElementById(pageId);
-  if (targetPage) targetPage.style.display = 'block';
-  
-  const targetLink = document.querySelector(`.sidebar-menu a[data-page="${pageId}"]`);
-  if (targetLink) targetLink.classList.add('active');
-  
-  if (pageId === 'dashboard') renderDashboard();
-  if (pageId === 'referate') renderReferate();
-  if (pageId === 'budgetplanung') renderBudgetplanung();
-  if (pageId === 'istwerte') renderIstwerte();
-  if (pageId === 'benutzer') renderBenutzer();
+  if (pageId === 'login') {
+    if (loginScreen) loginScreen.classList.remove('app-hidden');
+    if (appScreen) appScreen.classList.add('app-hidden');
+  } else {
+    if (loginScreen) loginScreen.classList.add('app-hidden');
+    if (appScreen) appScreen.classList.remove('app-hidden');
+    
+    document.querySelectorAll('.page-content').forEach(p => p.style.display = 'none');
+    document.querySelectorAll('.sidebar-menu a').forEach(a => a.classList.remove('active'));
+    
+    const targetPage = document.getElementById(`page-${pageId}`) || document.getElementById(pageId);
+    if (targetPage) targetPage.style.display = 'block';
+    
+    const targetLink = document.querySelector(`.sidebar-menu a[data-page="${pageId}"]`);
+    if (targetLink) targetLink.classList.add('active');
+    
+    if (pageId === 'dashboard') renderDashboard();
+    if (pageId === 'referate') renderReferate();
+    if (pageId === 'istwerte') renderIstwerte();
+    if (pageId === 'benutzer') renderBenutzer();
+  }
 }
 
 // ==========================================================================
@@ -228,19 +238,15 @@ function toggleReferatSperre(id) {
   if (r) {
     r.gesperrt = !r.gesperrt;
     if (!r.freigabeHistorie) r.freigabeHistorie = [];
-    
     const aktion = r.gesperrt ? 'FIXIERT & FREIGEGEBEN' : 'WIEDER ENTSPERRT';
     r.freigabeHistorie.push(`${getCurrentTimestamp()} von ${state.currentUser.name} (${aktion})`);
-    
     saveState();
     renderReferate();
   }
 }
 
-function renderBudgetplanung() { /* Budgetplanungs-Tabellengenerierung */ }
-
 // ==========================================================================
-// 6. IST-WERTE ERFASSUNG MIT VALIDIERUNG UND FIXIERUNG (4-AUGEN-PRINZIP)
+// 6. IST-WERTE ERFASSUNG
 // ==========================================================================
 
 function renderIstwerte() {
@@ -303,4 +309,165 @@ function updateIstWert(id, value) {
 function fixiereWert(id) {
   if (!isPruefer()) return;
   const d = getYearData();
-  const b = d.
+  const b = d.buchungssaetze.find(item => item.id === id);
+  if (b) {
+    b.fixiert = true;
+    b.fixiertVon = state.currentUser.name;
+    b.fixiertAm = getCurrentTimestamp();
+    saveState();
+    renderIstwerte();
+  }
+}
+
+function unfixiereWert(id) {
+  if (!isAdmin()) return;
+  const d = getYearData();
+  const b = d.buchungssaetze.find(item => item.id === id);
+  if (b) {
+    b.fixiert = false;
+    b.fixiertVon = null;
+    b.fixiertAm = null;
+    saveState();
+    renderIstwerte();
+  }
+}
+
+// ==========================================================================
+// 7. BENUTZERVERWALTUNG
+// ==========================================================================
+
+function renderBenutzer() {
+  if (!isAdmin()) return;
+  const tbody = document.getElementById('benutzer-table-body');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  state.users.forEach(u => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><strong>${u.name}</strong></td>
+      <td><code>${u.username}</code></td>
+      <td>${u.email || '-'}</td>
+      <td><span class="badge bg-secondary">${u.role.toUpperCase()}</span></td>
+      <td>${u.active !== false ? '<span class="badge bg-success">Aktiv</span>' : '<span class="badge bg-danger">Inaktiv</span>'}</td>
+      <td>
+        ${u.id !== 'u1' ? `
+          <button class="btn btn-sm btn-outline-warning" onclick="toggleUserActive('${u.id}')">${u.active !== false ? 'Deaktivieren' : 'Aktivieren'}</button>
+        ` : '<span class="text-muted">Haupt-Admin</span>'}
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function handleCreateUser(event) {
+  if (event) event.preventDefault();
+  
+  const nameInput = document.getElementById('user-new-name') || document.querySelector('[name="name"]');
+  const userInput = document.getElementById('user-new-username') || document.querySelector('[name="username"]');
+  const emailInput = document.getElementById('user-new-email') || document.querySelector('[name="email"]');
+  const roleSelect = document.getElementById('user-new-role') || document.querySelector('[name="role"]');
+  const passInput = document.getElementById('user-new-password') || document.querySelector('[name="password"]');
+
+  if (!nameInput || !userInput || !passInput) return;
+
+  const usernameClean = userInput.value.trim().toLowerCase();
+  const emailClean = emailInput ? emailInput.value.trim().toLowerCase() : '';
+
+  if (!usernameClean || !passInput.value) {
+    alert('Bitte füllen Sie mindestens Benutzernamen und Passwort aus!');
+    return;
+  }
+
+  const existiert = state.users.some(u => u.username.toLowerCase() === usernameClean || (emailClean && u.email && u.email.toLowerCase() === emailClean));
+  if (existiert) {
+    alert('Fehler: Ein Benutzer mit diesem Benutzernamen oder dieser E-Mail-Adresse ist bereits vorhanden!');
+    return;
+  }
+
+  const newUser = {
+    id: uid(),
+    name: nameInput.value.trim(),
+    username: usernameClean,
+    email: emailClean,
+    role: roleSelect ? roleSelect.value : 'schreiber',
+    password: passInput.value,
+    active: true
+  };
+
+  state.users.push(newUser);
+  saveState();
+  
+  nameInput.value = ''; userInput.value = ''; passInput.value = '';
+  if (emailInput) emailInput.value = '';
+
+  alert(`Der Benutzer "${newUser.name}" wurde erfolgreich hinzugefügt!`);
+  renderBenutzer();
+}
+
+function toggleUserActive(id) {
+  if (id === 'u1') return;
+  const user = state.users.find(u => u.id === id);
+  if (user) {
+    user.active = user.active === false ? true : false;
+    saveState();
+    renderBenutzer();
+  }
+}
+
+// ==========================================================================
+// 8. INITIALISIERUNG & GLOBAL LOGIN
+// ==========================================================================
+
+window.doLogin = function(event) {
+  if (event) event.preventDefault();
+  
+  const uInput = document.getElementById('login-username') || document.getElementById('login_username') || document.querySelector('input[type="text"]') || document.querySelector('[name="username"]');
+  const pInput = document.getElementById('login-password') || document.getElementById('login_password') || document.querySelector('input[type="password"]') || document.querySelector('[name="password"]');
+  const errorMsg = document.getElementById('login-error-msg') || document.getElementById('login_error_msg') || document.querySelector('.error-message') || document.querySelector('.alert-danger');
+  
+  if (!uInput || !pInput) return;
+
+  if (checkLogin(uInput.value, pInput.value)) {
+    if (errorMsg) errorMsg.style.display = 'none';
+    navigate('dashboard');
+    
+    const profName = document.getElementById('user-profile-name') || document.getElementById('userNameDisplay');
+    if (profName) profName.innerText = state.currentUser.name;
+  } else {
+    if (errorMsg) errorMsg.style.display = 'block';
+    alert('Anmeldedaten falsch oder Benutzer inaktiv.');
+  }
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+  const loginForm = document.getElementById('login-form') || document.getElementById('login_form') || document.querySelector('form');
+  if (loginForm) {
+    loginForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      window.doLogin(e);
+    });
+  }
+
+  const createUserBtn = document.getElementById('btn-save-new-user') || document.getElementById('save_user_btn');
+  if (createUserBtn) {
+    createUserBtn.addEventListener('click', handleCreateUser);
+  }
+
+  const logoutBtn = document.getElementById('btn-logout') || document.getElementById('logout_btn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => {
+      state.currentUser = null;
+      saveState();
+      window.location.reload(); 
+    });
+  }
+
+  if (state.currentUser) {
+    const profName = document.getElementById('user-profile-name') || document.getElementById('userNameDisplay');
+    if (profName) profName.innerText = state.currentUser.name;
+    navigate('dashboard');
+  } else {
+    navigate('login');
+  }
+});
