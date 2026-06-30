@@ -310,34 +310,8 @@ function updateIstWert(id, value) {
   renderIstwerte();
 }
 
-function fixiereWert(id) {
-  if (!isPruefer()) return;
-  const d = getYearData();
-  const b = d.buchungssaetze.find(item => item.id === id);
-  if (b) {
-    b.fixiert = true;
-    b.fixiertVon = state.currentUser.name;
-    b.fixiertAm = getCurrentTimestamp();
-    saveState();
-    renderIstwerte();
-  }
-}
-
-function unfixiereWert(id) {
-  if (!isAdmin()) return;
-  const d = getYearData();
-  const b = d.buchungssaetze.find(item => item.id === id);
-  if (b) {
-    b.fixiert = false;
-    b.fixiertVon = null;
-    b.fixiertAm = null;
-    saveState();
-    renderIstwerte();
-  }
-}
-
 // ==========================================================================
-// 7. BENUTZERVERWALTUNG (MIT PASSWORT-ANZEIGE)
+// 7. BENUTZERVERWALTUNG
 // ==========================================================================
 
 function renderBenutzer() {
@@ -460,15 +434,25 @@ window.doLogin = function(event) {
   }
 };
 
-document.addEventListener('DOMContentLoaded', () => {
-  // Pröziseres Entfernen des Erstanmeldetextes, um Navigationselemente nicht zu beeinträchtigen
-  setTimeout(() => {
-    document.querySelectorAll('.card p, .login-box p, form + p, small').forEach(el => {
-      if (el.textContent.includes('Erstanmeldung:')) {
-        el.style.setProperty('display', 'none', 'important');
+// ABSOLUT SICHERES ENTFERNEN DES ERSTANMELDETEXTES
+function hideErstanmeldungText() {
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+  let textNode = walker.nextNode();
+  while (textNode) {
+    if (textNode.nodeValue && textNode.nodeValue.includes('Erstanmeldung:')) {
+      const parent = textNode.parentElement;
+      if (parent && parent.tagName !== 'SCRIPT' && parent.tagName !== 'STYLE') {
+        parent.style.setProperty('display', 'none', 'important');
       }
-    });
-  }, 100);
+    }
+    textNode = walker.nextNode(); // Sicherer Fortschritt zur Vermeidung von Endlosschleifen
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  hideErstanmeldungText();
+  setTimeout(hideErstanmeldungText, 150);
+  setTimeout(hideErstanmeldungText, 500);
 
   const loginForm = document.getElementById('login-form') || document.getElementById('login_form') || document.querySelector('form');
   if (loginForm) {
@@ -478,7 +462,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Event Listener für Menü-Links reaktivieren, falls sie blockiert waren
   document.querySelectorAll('.sidebar-menu a').forEach(link => {
     link.addEventListener('click', (e) => {
       const page = link.getAttribute('data-page');
