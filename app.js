@@ -1,45 +1,58 @@
-const DEFAULT_STATE = { currentYear: 2025, currentUser: null, users: [{id: 'u1', name: 'Admin', username: 'admin', role: 'admin', password: 'admin123', active: true}], years: { 2025: { referate: [], buchungssaetze: [] } } };
-let state = JSON.parse(localStorage.getItem('bmv_budget_state')) || DEFAULT_STATE;
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vereinsbudget</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .hidden { display: none !important; }
+        .sidebar { height: 100vh; background: #198754; color: white; padding: 20px; }
+        .nav-link { color: white !important; cursor: pointer; }
+    </style>
+</head>
+<body>
 
-function navigate(pageId) {
-    if (!state.currentUser && pageId !== 'login') pageId = 'login';
-    
-    document.getElementById('loginScreen').classList.toggle('hidden', pageId !== 'login');
-    document.getElementById('app').classList.toggle('hidden', pageId === 'login');
-    
-    document.querySelectorAll('.page-content').forEach(p => p.classList.add('hidden'));
-    const target = document.getElementById('page-' + pageId);
-    if(target) target.classList.remove('hidden');
-    
-    if (pageId === 'dashboard') renderDashboard();
-}
+<div id="app" class="container-fluid hidden">
+    <div class="row">
+        <aside class="col-md-2 sidebar">
+            <h5>Vereinsbudget</h5>
+            <hr>
+            <nav class="nav flex-column">
+                <a class="nav-link" onclick="location.reload()">Dashboard neu laden</a>
+            </nav>
+        </aside>
+        <main class="col-md-10 p-4">
+            <h2>Dashboard</h2>
+            <div class="row mt-4">
+                <div class="col-md-4">
+                    <div class="card p-3 shadow-sm">
+                        <h6>Einnahmen</h6>
+                        <h4 id="dash-ein">1.500,00 €</h4>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card p-3 shadow-sm">
+                        <h6>Ausgaben</h6>
+                        <h4 id="dash-aus">800,00 €</h4>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
 
-function renderDashboard() {
-    const dash = document.getElementById('dash-budget-ein');
-    if (!dash) return;
-    dash.innerText = "Daten geladen..."; 
-}
+<div id="loginScreen" class="container mt-5">
+    <div class="card mx-auto shadow" style="max-width: 400px; padding: 30px;">
+        <h3 class="text-center mb-4">Anmelden</h3>
+        <form id="loginForm">
+            <input type="text" id="user" class="form-control mb-3" placeholder="Benutzername" required>
+            <input type="password" id="pass" class="form-control mb-3" placeholder="Passwort" required>
+            <button type="submit" class="btn btn-success w-100">Login</button>
+        </form>
+    </div>
+</div>
 
-document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('login-form').addEventListener('submit', (e) => {
-        e.preventDefault();
-        const u = document.getElementById('login-username').value;
-        const p = document.getElementById('login-password').value;
-        if (u === 'admin' && p === 'admin123') {
-            state.currentUser = state.users[0];
-            localStorage.setItem('bmv_budget_state', JSON.stringify(state));
-            navigate('dashboard');
-        } else {
-            alert('Falsche Daten');
-        }
-    });
-
-    document.querySelectorAll('.sidebar-menu a[data-page]').forEach(link => {
-        link.addEventListener('click', (e) => {
-            e.preventDefault();
-            navigate(link.dataset.page);
-        });
-    });
-
-    if (state.currentUser) navigate('dashboard');
-});
+<script src="app.js"></script>
+</body>
+</html>
